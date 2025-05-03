@@ -1,0 +1,26 @@
+<script>
+    ymaps.ready(init);
+    function init() {
+        var myMap = new ymaps.Map("myMap", {
+            center: [geocode.latitude, geocode.longitude],
+            zoom: 10,
+        });
+
+        let route = ymaps.route([
+            [Address Restaurant],
+            type: 'viaPoint',
+            point: 'geocode response',
+        ]);,
+        'Customer Adress'
+    }.then(
+        function(route) {
+            myMap.geoObjects.add(route);
+
+            var routeLength = route.getLength();
+            var firstPathFirstSegmentJamsTime = firstPathFirstSegment.getJamsTime();
+        },
+        function (error) {
+            console.log('Error: ' + error.message);
+        }
+    )
+</script>

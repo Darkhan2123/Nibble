@@ -1,0 +1,442 @@
+{% extends "layout.html" %}
+
+{% block title %}Driver Analytics - UberEats Analytics Dashboard{% endblock %}
+
+{% block content %}
+<div class="pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Driver Performance Analytics</h1>
+    <p class="text-muted">Track driver performance metrics and delivery times.</p>
+</div>
+
+<div class="row">
+    <!-- Performance Overview -->
+    <div class="col-md-12 mb-4">
+        <div class="dashboard-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Top Performing Drivers</span>
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary" id="refreshDriversBtn">
+                        <span class="bi bi-arrow-repeat"></span> Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Driver ID</th>
+                                <th>Deliveries</th>
+                                <th>Avg. Delivery Time</th>
+                                <th>Avg. Rating</th>
+                                <th>Total Tips</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="driversTableBody">
+                            <!-- Driver data will be loaded here -->
+                            <tr>
+                                <td colspan="6" class="text-center">Loading driver data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delivery Time Distribution -->
+    <div class="col-md-6 mb-4">
+        <div class="dashboard-card">
+            <div class="card-header">
+                Delivery Time Distribution
+            </div>
+            <div class="card-body">
+                <canvas id="deliveryTimeChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Driver Activity -->
+    <div class="col-md-6 mb-4">
+        <div class="dashboard-card">
+            <div class="card-header">
+                Driver Daily Performance
+            </div>
+            <div class="card-body">
+                <div id="driverSelector" class="mb-3">
+                    <label for="selectedDriver" class="form-label">Select Driver:</label>
+                    <select class="form-select" id="selectedDriver">
+                        <option value="">Select a driver...</option>
+                    </select>
+                </div>
+                <canvas id="driverDailyChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let deliveryTimeChart;
+    let driverDailyChart;
+    
+    // Function to format time
+    function formatMinutes(minutes) {
+        return minutes.toFixed(1) + ' min';
+    }
+    
+    // Function to format currency
+    function formatCurrency(amount) {
+        return '$' + amount.toFixed(2);
+    }
+    
+    // Load driver performance data
+    async function loadDriverPerformance() {
+        try {
+            // Get current time range from URL or default to 7d
+            const urlParams = new URLSearchParams(window.location.search);
+            const timeRange = urlParams.get('time_range') || '7d';
+            
+            // Convert time range to date parameters
+            let startDate, endDate;
+            const now = new Date();
+            
+            switch(timeRange) {
+                case '30d':
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 30);
+                    break;
+                case '90d':
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 90);
+                    break;
+                default: // 7d
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 7);
+            }
+            
+            // Format dates for API
+            const startDateStr = startDate.toISOString().split('T')[0];
+            const endDateStr = now.toISOString().split('T')[0];
+            
+            // Fetch driver performance data from API
+            const response = await fetch(`/api/drivers/performance?start_date=${startDateStr}&end_date=${endDateStr}`);
+            const data = await response.json();
+            
+            // Update the table
+            const tableBody = document.getElementById('driversTableBody');
+            if (data.metrics && data.metrics.length > 0) {
+                tableBody.innerHTML = '';
+                
+                // Also populate the driver selector
+                const driverSelector = document.getElementById('selectedDriver');
+                driverSelector.innerHTML = '<option value="">Select a driver...</option>';
+                
+                data.metrics.forEach(driver => {
+                    // Add to table
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${driver.driver_id}</td>
+                        <td>${driver.delivery_count}</td>
+                        <td>${formatMinutes(driver.avg_delivery_time)}</td>
+                        <td>${driver.avg_rating.toFixed(1)}</td>
+                        <td>${formatCurrency(driver.total_tips)}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary view-driver" data-driver-id="${driver.driver_id}">
+                                View Details
+                            </button>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                    
+                    // Add to selector
+                    const option = document.createElement('option');
+                    option.value = driver.driver_id;
+                    option.textContent = `${driver.driver_id} (${driver.delivery_count} deliveries)`;
+                    driverSelector.appendChild(option);
+                });
+                
+                // Add event listeners to view details buttons
+                document.querySelectorAll('.view-driver').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const driverId = this.getAttribute('data-driver-id');
+                        document.getElementById('selectedDriver').value = driverId;
+                        loadDriverDailyStats(driverId);
+                    });
+                });
+            } else {
+                tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No driver data available</td></tr>';
+            }
+            
+            // Load delivery time distribution
+            loadDeliveryTimeDistribution();
+            
+        } catch (error) {
+            console.error('Error loading driver performance:', error);
+            document.getElementById('driversTableBody').innerHTML = 
+                '<tr><td colspan="6" class="text-center text-danger">Error loading driver data</td></tr>';
+        }
+    }
+    
+    // Load delivery time distribution chart
+    async function loadDeliveryTimeDistribution() {
+        try {
+            // Get current time range from URL or default to 7d
+            const urlParams = new URLSearchParams(window.location.search);
+            const timeRange = urlParams.get('time_range') || '7d';
+            
+            // Convert time range to date parameters
+            let startDate, endDate;
+            const now = new Date();
+            
+            switch(timeRange) {
+                case '30d':
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 30);
+                    break;
+                case '90d':
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 90);
+                    break;
+                default: // 7d
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 7);
+            }
+            
+            // Format dates for API
+            const startDateStr = startDate.toISOString().split('T')[0];
+            const endDateStr = now.toISOString().split('T')[0];
+            
+            // Fetch data from API
+            const response = await fetch(`/api/drivers/delivery-times?start_date=${startDateStr}&end_date=${endDateStr}`);
+            const data = await response.json();
+            
+            // Predefined order of time ranges for consistent display
+            const timeRangeOrder = [
+                'Under 15 min', 
+                '15-30 min', 
+                '30-45 min', 
+                '45-60 min', 
+                'Over 60 min'
+            ];
+            
+            // Prepare data for chart
+            const labels = [];
+            const values = [];
+            
+            timeRangeOrder.forEach(range => {
+                labels.push(range);
+                values.push(data.time_ranges[range] || 0);
+            });
+            
+            // Define chart colors
+            const backgroundColors = [
+                'rgba(75, 192, 192, 0.6)',
+                'rgba(54, 162, 235, 0.6)',
+                'rgba(255, 206, 86, 0.6)',
+                'rgba(255, 159, 64, 0.6)',
+                'rgba(255, 99, 132, 0.6)'
+            ];
+            
+            // Create/update chart
+            const ctx = document.getElementById('deliveryTimeChart').getContext('2d');
+            
+            if (deliveryTimeChart) {
+                deliveryTimeChart.data.labels = labels;
+                deliveryTimeChart.data.datasets[0].data = values;
+                deliveryTimeChart.update();
+            } else {
+                deliveryTimeChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Number of Deliveries',
+                            data: values,
+                            backgroundColor: backgroundColors,
+                            borderColor: backgroundColors.map(color => color.replace('0.6', '1')),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            title: {
+                                display: true,
+                                text: 'Delivery Time Distribution'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const value = context.raw;
+                                        const percentage = (value / data.total_deliveries * 100).toFixed(1);
+                                        return `${value} deliveries (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Number of Deliveries'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error('Error loading delivery time distribution:', error);
+        }
+    }
+    
+    // Load driver daily stats
+    async function loadDriverDailyStats(driverId) {
+        if (!driverId) {
+            // Clear chart if no driver selected
+            if (driverDailyChart) {
+                driverDailyChart.destroy();
+                driverDailyChart = null;
+            }
+            return;
+        }
+        
+        try {
+            // Get current time range from URL or default to 7d
+            const urlParams = new URLSearchParams(window.location.search);
+            const timeRange = urlParams.get('time_range') || '7d';
+            
+            // Convert time range to date parameters
+            let startDate, endDate;
+            const now = new Date();
+            
+            switch(timeRange) {
+                case '30d':
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 30);
+                    break;
+                case '90d':
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 90);
+                    break;
+                default: // 7d
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 7);
+            }
+            
+            // Format dates for API
+            const startDateStr = startDate.toISOString().split('T')[0];
+            const endDateStr = now.toISOString().split('T')[0];
+            
+            // Fetch data from API
+            const response = await fetch(`/api/drivers/drivers/${driverId}/daily-stats?start_date=${startDateStr}&end_date=${endDateStr}`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch driver daily stats');
+            }
+            
+            const data = await response.json();
+            
+            // Prepare data for chart
+            const dates = data.daily_stats.map(stat => stat.delivery_date);
+            const deliveryCounts = data.daily_stats.map(stat => stat.delivery_count);
+            const avgDeliveryTimes = data.daily_stats.map(stat => stat.avg_delivery_time);
+            
+            // Create/update chart
+            const ctx = document.getElementById('driverDailyChart').getContext('2d');
+            
+            if (driverDailyChart) {
+                driverDailyChart.destroy();
+            }
+            
+            driverDailyChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Deliveries',
+                            data: deliveryCounts,
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 2,
+                            yAxisID: 'y',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Avg. Delivery Time (min)',
+                            data: avgDeliveryTimes,
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2,
+                            yAxisID: 'y1',
+                            tension: 0.1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `Daily Performance for Driver ${driverId}`
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Delivery Count'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                            title: {
+                                display: true,
+                                text: 'Avg. Delivery Time (min)'
+                            }
+                        }
+                    }
+                }
+            });
+            
+        } catch (error) {
+            console.error('Error loading driver daily stats:', error);
+        }
+    }
+    
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load initial data
+        loadDriverPerformance();
+        
+        // Refresh button
+        document.getElementById('refreshDriversBtn').addEventListener('click', loadDriverPerformance);
+        
+        // Driver selector change
+        document.getElementById('selectedDriver').addEventListener('change', function() {
+            loadDriverDailyStats(this.value);
+        });
+    });
+</script>
+{% endblock %}

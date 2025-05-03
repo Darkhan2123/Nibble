@@ -1,0 +1,46 @@
+{
+  "schemaName": "orders",
+  "dimensionFieldSpecs": [
+    { "name": "order_id", "dataType": "STRING" },
+    { "name": "customer_id", "dataType": "STRING" },
+    { "name": "restaurant_id", "dataType": "STRING" },
+    { "name": "driver_id", "dataType": "STRING" },
+    { "name": "status", "dataType": "STRING" },
+    { "name": "payment_method", "dataType": "STRING" },
+    { "name": "payment_status", "dataType": "STRING" },
+    { "name": "city", "dataType": "STRING" },
+    { "name": "state", "dataType": "STRING" },
+    { "name": "postal_code", "dataType": "STRING" },
+    { "name": "cuisine_type", "dataType": "STRING" },
+    { "name": "cancelled_by", "dataType": "STRING" },
+    { "name": "cancellation_reason", "dataType": "STRING" }
+  ],
+  "metricFieldSpecs": [
+    { "name": "subtotal", "dataType": "DOUBLE" },
+    { "name": "tax", "dataType": "DOUBLE" },
+    { "name": "delivery_fee", "dataType": "DOUBLE" },
+    { "name": "tip", "dataType": "DOUBLE" },
+    { "name": "promo_discount", "dataType": "DOUBLE" },
+    { "name": "total_amount", "dataType": "DOUBLE" },
+    { "name": "preparation_time_minutes", "dataType": "INT" },
+    { "name": "delivery_time_minutes", "dataType": "INT" },
+    { "name": "total_time_minutes", "dataType": "INT" },
+    { "name": "food_rating", "dataType": "INT" },
+    { "name": "delivery_rating", "dataType": "INT" },
+    { "name": "item_count", "dataType": "INT" }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "created_at",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    },
+    {
+      "name": "delivery_time",
+      "dataType": "TIMESTAMP",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    }
+  ]
+}

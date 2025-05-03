@@ -1,0 +1,329 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard - UberEats Analytics{% endblock %}
+
+{% block content %}
+<div class="pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Analytics Dashboard</h1>
+    <p class="text-muted">Overview of key performance metrics for UberEats Clone</p>
+</div>
+
+<div class="row">
+    <!-- Quick stats -->
+    <div class="col-md-3">
+        <div class="dashboard-card metric-card">
+            <div class="stat-value" id="totalOrdersValue">--</div>
+            <div class="stat-label">Total Orders</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="dashboard-card metric-card">
+            <div class="stat-value" id="totalRevenueValue">--</div>
+            <div class="stat-label">Total Revenue</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="dashboard-card metric-card">
+            <div class="stat-value" id="avgOrderValueValue">--</div>
+            <div class="stat-label">Avg. Order Value</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="dashboard-card metric-card">
+            <div class="stat-value" id="avgDeliveryTimeValue">--</div>
+            <div class="stat-label">Avg. Delivery Time</div>
+        </div>
+    </div>
+
+    <!-- Orders by status -->
+    <div class="col-md-6 mb-4">
+        <div class="dashboard-card">
+            <div class="card-header">
+                Orders by Status
+            </div>
+            <div class="card-body">
+                <canvas id="orderStatusChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Orders by hour -->
+    <div class="col-md-6 mb-4">
+        <div class="dashboard-card">
+            <div class="card-header">
+                Orders by Hour of Day
+            </div>
+            <div class="card-body">
+                <canvas id="ordersByHourChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top restaurants -->
+    <div class="col-md-12 mb-4">
+        <div class="dashboard-card">
+            <div class="card-header">
+                Top Performing Restaurants
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Restaurant ID</th>
+                                <th>Order Count</th>
+                                <th>Total Revenue</th>
+                                <th>Average Order Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topRestaurantsBody">
+                            <!-- Data will be loaded here -->
+                            <tr>
+                                <td colspan="4" class="text-center">Loading restaurant data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let orderStatusChart;
+    let ordersByHourChart;
+    
+    // Function to format currency
+    function formatCurrency(amount) {
+        return '$' + parseFloat(amount).toFixed(2);
+    }
+    
+    // Function to format time
+    function formatMinutes(minutes) {
+        return parseFloat(minutes).toFixed(1) + ' min';
+    }
+    
+    // Load dashboard data
+    async function loadDashboardData() {
+        try {
+            // Get current time range from URL or default to 7d
+            const urlParams = new URLSearchParams(window.location.search);
+            const timeRange = urlParams.get('time_range') || '7d';
+            
+            // Convert time range to date parameters
+            let startDate, endDate;
+            const now = new Date();
+            
+            switch(timeRange) {
+                case '30d':
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 30);
+                    break;
+                case '90d':
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 90);
+                    break;
+                default: // 7d
+                    startDate = new Date(now);
+                    startDate.setDate(now.getDate() - 7);
+            }
+            
+            // Format dates for API
+            const startDateStr = startDate.toISOString().split('T')[0];
+            const endDateStr = now.toISOString().split('T')[0];
+            
+            // Parallel fetch requests for different metrics
+            const [orderCountResponse, revenueResponse, avgValuesResponse, statusBreakdownResponse, 
+                   hourlyDistributionResponse, topRestaurantsResponse] = await Promise.all([
+                fetch(`/api/orders/count?start_date=${startDateStr}&end_date=${endDateStr}`),
+                fetch(`/api/orders/revenue?start_date=${startDateStr}&end_date=${endDateStr}`),
+                fetch(`/api/orders/average-values?start_date=${startDateStr}&end_date=${endDateStr}`),
+                fetch(`/api/orders/status-breakdown?start_date=${startDateStr}&end_date=${endDateStr}`),
+                fetch(`/api/orders/hourly-distribution?start_date=${startDateStr}&end_date=${endDateStr}`),
+                fetch(`/api/orders/top-restaurants?start_date=${startDateStr}&end_date=${endDateStr}`)
+            ]);
+            
+            // Parse responses
+            const orderCount = await orderCountResponse.json();
+            const revenue = await revenueResponse.json();
+            const avgValues = await avgValuesResponse.json();
+            const statusBreakdown = await statusBreakdownResponse.json();
+            const hourlyDistribution = await hourlyDistributionResponse.json();
+            const topRestaurants = await topRestaurantsResponse.json();
+            
+            // Update quick stats
+            document.getElementById('totalOrdersValue').textContent = orderCount.order_count;
+            document.getElementById('totalRevenueValue').textContent = formatCurrency(revenue.total_revenue);
+            document.getElementById('avgOrderValueValue').textContent = formatCurrency(avgValues.average_order_value);
+            document.getElementById('avgDeliveryTimeValue').textContent = formatMinutes(avgValues.average_delivery_time_minutes);
+            
+            // Update status breakdown chart
+            updateOrderStatusChart(statusBreakdown.status_breakdown);
+            
+            // Update orders by hour chart
+            updateOrdersByHourChart(hourlyDistribution.hourly_distribution);
+            
+            // Update top restaurants table
+            updateTopRestaurantsTable(topRestaurants.top_restaurants);
+            
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+        }
+    }
+    
+    // Update order status chart
+    function updateOrderStatusChart(statusData) {
+        // Convert object to arrays for Chart.js
+        const labels = Object.keys(statusData);
+        const values = Object.values(statusData);
+        
+        // Define colors for each status
+        const statusColors = {
+            'pending': 'rgba(54, 162, 235, 0.6)',
+            'preparing': 'rgba(255, 206, 86, 0.6)',
+            'ready': 'rgba(75, 192, 192, 0.6)',
+            'in_delivery': 'rgba(153, 102, 255, 0.6)',
+            'delivered': 'rgba(75, 192, 192, 0.6)',
+            'cancelled': 'rgba(255, 99, 132, 0.6)'
+        };
+        
+        // Map colors to labels
+        const backgroundColors = labels.map(label => statusColors[label] || 'rgba(201, 203, 207, 0.6)');
+        
+        const ctx = document.getElementById('orderStatusChart').getContext('2d');
+        
+        if (orderStatusChart) {
+            orderStatusChart.data.labels = labels;
+            orderStatusChart.data.datasets[0].data = values;
+            orderStatusChart.data.datasets[0].backgroundColor = backgroundColors;
+            orderStatusChart.update();
+        } else {
+            orderStatusChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: backgroundColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    // Update orders by hour chart
+    function updateOrdersByHourChart(hourlyData) {
+        // Convert object to arrays for Chart.js, ensuring all 24 hours are represented
+        const labels = [];
+        const values = [];
+        
+        for (let i = 0; i < 24; i++) {
+            labels.push(i);
+            values.push(hourlyData[i] || 0);
+        }
+        
+        const ctx = document.getElementById('ordersByHourChart').getContext('2d');
+        
+        if (ordersByHourChart) {
+            ordersByHourChart.data.labels = labels;
+            ordersByHourChart.data.datasets[0].data = values;
+            ordersByHourChart.update();
+        } else {
+            ordersByHourChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Orders',
+                        data: values,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(tooltipItems) {
+                                    const hour = tooltipItems[0].label;
+                                    return `Hour: ${hour}:00 - ${(parseInt(hour) + 1) % 24}:00`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Hour of Day'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Number of Orders'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    // Update top restaurants table
+    function updateTopRestaurantsTable(restaurants) {
+        const tableBody = document.getElementById('topRestaurantsBody');
+        
+        if (restaurants && restaurants.length > 0) {
+            tableBody.innerHTML = '';
+            
+            restaurants.forEach(restaurant => {
+                const row = document.createElement('tr');
+                const avgOrderValue = restaurant.total_revenue / restaurant.order_count;
+                
+                row.innerHTML = `
+                    <td>${restaurant.restaurant_id}</td>
+                    <td>${restaurant.order_count}</td>
+                    <td>${formatCurrency(restaurant.total_revenue)}</td>
+                    <td>${formatCurrency(avgOrderValue)}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+        } else {
+            tableBody.innerHTML = '<tr><td colspan="4" class="text-center">No restaurant data available</td></tr>';
+        }
+    }
+    
+    // Load initial data on page load
+    document.addEventListener('DOMContentLoaded', loadDashboardData);
+</script>
+{% endblock %}

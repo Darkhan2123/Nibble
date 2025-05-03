@@ -1,0 +1,73 @@
+import logging
+import asyncpg
+from typing import Dict, List, Any, Optional, AsyncGenerator
+
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+# Connection pool
+pool: Optional[asyncpg.Pool] = None
+
+async def init_db() -> None:
+    """Initialize the database connection pool."""
+    global pool
+    try:
+        logger.info("Creating database connection pool")
+        pool = await asyncpg.create_pool(
+            dsn=settings.DATABASE_URL,
+            min_size=5,
+            max_size=20
+        )
+        logger.info("Database connection pool created successfully")
+    except Exception as e:
+        logger.error(f"Failed to create database connection pool: {e}")
+        raise
+
+async def get_connection() -> asyncpg.Connection:
+    """Get a database connection from the pool."""
+    global pool
+    if pool is None:
+        await init_db()
+    return await pool.acquire()
+
+async def get_db() -> AsyncGenerator[asyncpg.Connection, None]:
+    """Dependency to get a database connection from the pool."""
+    conn = await get_connection()
+    try:
+        yield conn
+    finally:
+        await pool.release(conn)
+
+async def transaction():
+    """Transaction context manager."""
+    conn = await get_connection()
+    tx = conn.transaction()
+    try:
+        await tx.start()
+        yield conn
+        await tx.commit()
+    except Exception:
+        await tx.rollback()
+        raise
+    finally:
+        await pool.release(conn)
+
+async def fetch_one(query: str, *args) -> Optional[Dict[str, Any]]:
+    """Execute a query and return one row as a dictionary."""
+    async with get_connection() as conn:
+        row = await conn.fetchrow(query, *args)
+        if row:
+            return dict(row)
+        return None
+
+async def fetch_all(query: str, *args) -> List[Dict[str, Any]]:
+    """Execute a query and return all rows as dictionaries."""
+    async with get_connection() as conn:
+        rows = await conn.fetch(query, *args)
+        return [dict(row) for row in rows]
+
+async def execute(query: str, *args) -> str:
+    """Execute a query and return the status."""
+    async with get_connection() as conn:
+        return await conn.execute(query, *args)

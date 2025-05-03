@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Delivery Route</title>
+    <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        .route-info {
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            max-width: 300px;
+        }
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.3);
+            z-index: 2000;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading">Loading map and calculating route...</div>
+    <div id="map"></div>
+    <div id="routeInfo" class="route-info" style="display:none;">
+        <h3>Delivery Route Information</h3>
+        <div id="routeDetails"></div>
+    </div>
+    
+    <script src="https://api-maps.yandex.ru/2.1/?lang=ru_RU&apikey={{ api_key }}"></script>
+    <script>
+        let map, route;
+        
+        ymaps.ready(init);
+        
+        function init() {
+            // Hide loading message
+            document.getElementById('loading').style.display = 'none';
+            
+            // Show route info panel
+            document.getElementById('routeInfo').style.display = 'block';
+            
+            // Create map centered at the midpoint between restaurant and customer
+            const centerLat = ({{ restaurant_lat }} + {{ customer_lat }}) / 2;
+            const centerLon = ({{ restaurant_lon }} + {{ customer_lon }}) / 2;
+            
+            map = new ymaps.Map("map", {
+                center: [centerLat, centerLon],
+                zoom: 12,
+                controls: ['zoomControl', 'typeSelector', 'fullscreenControl']
+            });
+            
+            // Add restaurant marker
+            const restaurantMarker = new ymaps.Placemark(
+                [{{ restaurant_lat }}, {{ restaurant_lon }}],
+                {
+                    balloonContent: '<strong>{{ restaurant_name }}</strong><br>Restaurant location'
+                },
+                {
+                    preset: 'islands#redFoodIcon'
+                }
+            );
+            map.geoObjects.add(restaurantMarker);
+            
+            // Add customer marker
+            const customerMarker = new ymaps.Placemark(
+                [{{ customer_lat }}, {{ customer_lon }}],
+                {
+                    balloonContent: '<strong>Delivery Address</strong><br>{{ customer_address }}'
+                },
+                {
+                    preset: 'islands#blueHomeIcon'
+                }
+            );
+            map.geoObjects.add(customerMarker);
+            
+            // Calculate route
+            ymaps.route([
+                ['{{ restaurant_lat }}', '{{ restaurant_lon }}'],
+                ['{{ customer_lat }}', '{{ customer_lon }}']
+            ], {
+                mapStateAutoApply: true,
+                avoidTrafficJams: true
+            }).then(function(routeResult) {
+                route = routeResult;
+                
+                // Add route to map
+                map.geoObjects.add(route);
+                
+                // Get the first route
+                const path = route.getPaths().get(0);
+                
+                // Calculate metrics
+                const distance = path.getLength(); // meters
+                const duration = path.getTime(); // seconds
+                const jamsTime = path.getJamsTime(); // seconds with traffic jams
+                
+                // Format distance
+                let distanceText;
+                if (distance >= 1000) {
+                    distanceText = (distance / 1000).toFixed(1) + ' km';
+                } else {
+                    distanceText = Math.round(distance) + ' m';
+                }
+                
+                // Format duration
+                const formatTime = (seconds) => {
+                    const minutes = Math.floor(seconds / 60);
+                    if (minutes < 60) {
+                        return minutes + ' min';
+                    } else {
+                        const hours = Math.floor(minutes / 60);
+                        const remainingMinutes = minutes % 60;
+                        return hours + ' h ' + remainingMinutes + ' min';
+                    }
+                };
+                
+                const durationText = formatTime(duration);
+                const jamsTimeText = formatTime(jamsTime);
+                const preparationTime = {{ preparation_time }};
+                const totalTimeText = formatTime(jamsTime + (preparationTime * 60));
+                
+                // Display route information
+                document.getElementById('routeDetails').innerHTML = `
+                    <p><strong>Distance:</strong> ${distanceText}</p>
+                    <p><strong>Normal duration:</strong> ${durationText}</p>
+                    <p><strong>Duration with traffic:</strong> ${jamsTimeText}</p>
+                    <p><strong>Restaurant preparation time:</strong> ${preparationTime} min</p>
+                    <p><strong>Total estimated delivery time:</strong> ${totalTimeText}</p>
+                `;
+                
+                // Fit the map to show the entire route
+                map.setBounds(route.getBounds(), { checkZoomRange: true, zoomMargin: 20 });
+                
+            }
+            ).catch(function(error) {
+                console.error("Error calculating route:", error);
+                document.getElementById('routeDetails').innerHTML = 
+                    '<p>Error calculating route. Please try again later.</p>';
+            });
+        }
+    </script>
+</body>
+</html>

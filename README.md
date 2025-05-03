@@ -63,7 +63,7 @@ This project uses a microservices architecture, with the following core services
 
    - http://localhost:8006/docs - Dashboard, Analytics Service endpoints
 
-    # For a complete list of available endpoints, see [API_PATHS.md](API_PATHS.md).
+    ### For a complete list of available endpoints, see [API_PATHS.md](API_PATHS.md).
 
 ## 🔐 Authentication
 

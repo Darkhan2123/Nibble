@@ -1,6 +1,6 @@
 # 🍔 Nibble
 
-![Nibble Logo](/images/Nibble-logo2.png)
+<img src="/images/Nibble-logo.png" alt="Nibble Logo" width="300" height="auto">
 
 ## 📚 Overview
 

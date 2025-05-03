@@ -75,6 +75,17 @@ Authorization: Bearer your_jwt_token_here
 
 You can obtain a token through the `/api/auth/login` endpoint.
 
+## 🔑 Demo Credentials
+
+  For testing purposes, you can use the following demo accounts:
+
+  - [Admin Credentials](/services/user/admin_credentials.json)
+  - [Restaurant Owner Credentials](/services/user/restaurant_credentials.json)
+  - [Driver Credentials](/services/user/driver_credentials.json)
+
+  **Note**: These credentials are for development/demo purposes only and should be removed in a
+  production environment.
+
 ## 🎯 Design Decisions & System Capabilities
 
 ### Scalability: How does the design handle growth in users or data?

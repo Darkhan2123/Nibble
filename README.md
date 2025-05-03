@@ -1,6 +1,6 @@
 # 🍔 Nibble
 
-![Nibble Logo](/images/Nibble-logo.png)
+![Nibble Logo](/images/Nibble-logo2.png)
 
 ## 📚 Overview
 

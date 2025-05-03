@@ -1,5 +1,3 @@
-### Nibble
-
 <p align="center">
   <img src="/images/Nibble-logo2.png" alt="Nibble Logo" width="300" height="auto">
 </p>

@@ -210,17 +210,9 @@ async def health_check():
 
 # Generic function to forward requests to appropriate services
 async def forward_request(service: str, path: str, request: Request):
-    # For troubleshooting, return a simplified response
-    # This is a temporary fix until we can properly debug all the microservices
-    if service not in ["user"]:  # Only allow user service for now
-        return JSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={
-                "detail": f"Service '{service}' is temporarily unavailable for maintenance",
-                "service": service,
-                "path": path
-            }
-        )
+    # Enable all services for full functionality
+    # Special handling for reviews - always allowed
+    if path.startswith("/api/v1/reviews") or service == "user":
         
     # Get service URL from the mapping
     service_url = SERVICE_URLS.get(service)
@@ -443,6 +435,27 @@ async def users_me(request: Request):
 @app.put("/api/users/me")
 async def users_me_update(request: Request):
     return await forward_request("user", "/api/v1/users/me", request)
+    
+# Routes for reviews
+@app.post("/api/reviews")
+async def create_review(request: Request):
+    return await forward_request("user", "/api/v1/reviews", request)
+
+@app.get("/api/reviews/me")
+async def get_my_reviews(request: Request):
+    return await forward_request("user", "/api/v1/reviews/me", request)
+
+@app.get("/api/reviews/restaurant/{restaurant_id}")
+async def get_restaurant_reviews(restaurant_id: str, request: Request):
+    return await forward_request("user", f"/api/v1/reviews/restaurant/{restaurant_id}", request)
+
+@app.get("/api/reviews/driver/{driver_id}")
+async def get_driver_reviews(driver_id: str, request: Request):
+    return await forward_request("user", f"/api/v1/reviews/driver/{driver_id}", request)
+
+@app.post("/api/reviews/{review_id}/response")
+async def respond_to_review(review_id: str, request: Request):
+    return await forward_request("user", f"/api/v1/reviews/{review_id}/response", request)
 
 @app.get("/api/users/{user_id}")
 async def get_user(user_id: str, request: Request):

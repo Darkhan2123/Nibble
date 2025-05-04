@@ -76,8 +76,8 @@ class ProfileRepository:
                 row = await conn.fetchrow(
                     query, 
                     user_id, 
-                    '[]'::jsonb,  # Empty array for dietary preferences
-                    '[]'::jsonb   # Empty array for favorite cuisines
+                    '[]',  # Empty array for dietary preferences
+                    '[]'   # Empty array for favorite cuisines
                 )
                 
                 # If insert was successful, return it

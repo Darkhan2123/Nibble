@@ -172,6 +172,15 @@ class RestaurantAnalyticsResponse(BaseModel):
     popular_items: List[Dict[str, Any]]
     busiest_times: List[Dict[str, Any]]
 
+class ReviewSummary(BaseModel):
+    id: str
+    customer_name: str
+    food_rating: Optional[int]
+    delivery_rating: Optional[int]
+    review_text: Optional[str]
+    reviewed_at: datetime
+    has_response: bool
+
 class RestaurantDashboardResponse(BaseModel):
     total_orders_today: int
     active_orders: int
@@ -179,4 +188,5 @@ class RestaurantDashboardResponse(BaseModel):
     cancelled_orders_today: int
     today_revenue: float
     current_status: str
-    recent_reviews: List[Dict[str, Any]]
+    recent_reviews: List[ReviewSummary]
+    average_rating: Optional[float]

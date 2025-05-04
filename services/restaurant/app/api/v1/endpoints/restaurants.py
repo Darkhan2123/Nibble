@@ -273,7 +273,7 @@ async def get_restaurant_dashboard(
     user_info: Dict[str, Any] = Depends(has_role("restaurant"))
 ):
     """
-    Get the restaurant dashboard data.
+    Get the restaurant dashboard data including recent reviews.
     """
     user_id = user_info["user_id"]
     restaurant_repo = RestaurantRepository()
@@ -286,8 +286,35 @@ async def get_restaurant_dashboard(
             detail="Restaurant not found for this user"
         )
     
+    # Get recent reviews from the user service
+    recent_reviews = []
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{settings.USER_SERVICE_URL}/api/v1/reviews/restaurant/{existing_restaurant['id']}",
+                params={"limit": 5, "offset": 0},  # Just get the 5 most recent reviews
+                headers={"Authorization": user_info["token"]}
+            )
+            
+            if response.status_code == 200:
+                reviews_data = response.json()
+                if "items" in reviews_data and reviews_data["items"]:
+                    for review in reviews_data["items"]:
+                        recent_reviews.append({
+                            "id": review["id"],
+                            "customer_name": f"{review.get('first_name', '')} {review.get('last_name', '')}".strip(),
+                            "food_rating": review.get("food_rating"),
+                            "delivery_rating": review.get("delivery_rating"),
+                            "review_text": review.get("review_text"),
+                            "reviewed_at": review.get("reviewed_at"),
+                            "has_response": review.get("review_response") is not None
+                        })
+    except Exception as e:
+        logger.error(f"Error fetching reviews for dashboard: {str(e)}")
+        # Continue even if reviews can't be fetched
+    
     # In a real application, this would query from multiple services
-    # For now, we'll return placeholder data
+    # For now, we'll return placeholder data with real reviews
     
     return {
         "total_orders_today": 0,
@@ -296,7 +323,8 @@ async def get_restaurant_dashboard(
         "cancelled_orders_today": 0,
         "today_revenue": 0,
         "current_status": "open" if existing_restaurant["is_active"] else "closed",
-        "recent_reviews": []
+        "recent_reviews": recent_reviews,
+        "average_rating": existing_restaurant.get("average_rating", 0)
     }
 
 @router.get("/me/analytics", response_model=RestaurantAnalyticsResponse)

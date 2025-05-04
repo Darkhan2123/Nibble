@@ -11,7 +11,7 @@ This project implements a full-featured food delivery platform similar to Wolt, 
 This project uses a microservices architecture, with the following core services:
 
 - **API Gateway**: Entry point for all API requests
-- **User Service**: User authentication and profile management
+- **User Service**: User authentication, profile management, and reviews
 - **Restaurant Service**: Restaurant and menu management
 - **Order Service**: Order processing and cart management
 - **Driver Service**: Driver management and delivery tracking
@@ -85,6 +85,21 @@ You can obtain a token through the `/api/auth/login` endpoint.
 
   **Note**: These credentials are for development/demo purposes only and should be removed in a
   production environment.
+
+## 🌟 Features
+
+### Restaurant and Driver Reviews
+
+Our platform includes a comprehensive review system:
+
+- **Restaurant Ratings**: Users can rate restaurants from 0 to 5 stars
+- **Food Quality Reviews**: Detailed text feedback on food quality
+- **Driver Ratings**: Separate ratings for delivery service
+- **Review Responses**: Restaurant owners can respond to customer reviews
+- **Rating Analytics**: Restaurant and driver average ratings
+- **Review Management**: Users can view their submitted reviews
+
+### Additional Features
 
 ## 🎯 Design Decisions & System Capabilities
 

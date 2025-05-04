@@ -61,6 +61,16 @@ User-related endpoints:
 - `PUT /api/users/{id}/addresses/{address_id}`: Update an address
 - `DELETE /api/users/{id}/addresses/{address_id}`: Delete an address
 
+### Review Service Endpoints
+
+Review-related endpoints:
+
+- `POST /api/reviews`: Create a new review
+- `GET /api/reviews/me`: Get reviews written by the current user
+- `GET /api/reviews/restaurant/{restaurant_id}`: Get reviews for a specific restaurant
+- `GET /api/reviews/driver/{driver_id}`: Get reviews for a specific driver
+- `POST /api/reviews/{review_id}/response`: Add a response to a review (for restaurant owners)
+
 ### Restaurant Service Endpoints
 
 Restaurant-related endpoints:

@@ -10,3 +10,4 @@ wheels/
 .venv
 
 ARCHITECTURE.md
+DATA_STORAGE_DESIGN.md

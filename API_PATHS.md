@@ -8,7 +8,7 @@ Authentication is required for most endpoints. You need to include an `Authoriza
 
 ```
 Authorization: Bearer your_jwt_token_here
-```
+``` 
 
 ## API Gateway
 
